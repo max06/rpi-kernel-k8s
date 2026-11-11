@@ -39,7 +39,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       build: ${{ steps.version.outputs.build }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - id: version
         env:
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # A build with DWARF debug info needs roughly 20 GB.
       - name: Free disk space
