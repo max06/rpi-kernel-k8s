@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
 # Runs as root inside a debian:trixie arm64 container: fetches the kernel source
 # package from the Raspberry Pi archive through apt (verified against the signed
 # index with the pinned archive key), installs build deps, then runs build.sh.

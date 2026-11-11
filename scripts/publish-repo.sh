@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
 # Build a signed apt repository from a directory of .deb files.
 #
 # Usage: scripts/publish-repo.sh <debs-dir> <site-dir>

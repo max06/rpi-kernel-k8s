@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
 # Rebuild the Raspberry Pi OS kernel source package (rpi-2712 flavour) with the
 # options in config/rpi-2712.config. Expects the source package files
 # (.dsc, .orig.tar.xz, .debian.tar.xz) in SRC_DIR and the build dependencies installed.

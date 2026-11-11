@@ -125,6 +125,7 @@ activity. Renovate's dependency updates usually keep the repository active.
 
 ## License
 
-The kernel is GPL-2.0. Its corresponding source is the Raspberry Pi OS source
+GPL-2.0-only, see [LICENSE](LICENSE), for this repository's scripts and config
+and, as always, for the kernel. The kernel's corresponding source is the Raspberry Pi OS source
 package named in each release, plus [`config/rpi-2712.config`](config/rpi-2712.config)
 and the changelog version bump in [`scripts/build.sh`](scripts/build.sh).
