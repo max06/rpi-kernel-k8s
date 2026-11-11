@@ -44,6 +44,7 @@ jobs:
       - id: version
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_REVISION: ${{ inputs.revision || '1' }}
           INPUT_FORCE: ${{ inputs.force || false }}
@@ -53,7 +54,13 @@ jobs:
           [[ $INPUT_REVISION =~ ^[0-9]+$ ]] || { echo "unexpected revision: $INPUT_REVISION"; exit 1; }
           tag="${version}+k8s${INPUT_REVISION}"
           build=true
-          if gh release view "$tag" >/dev/null 2>&1 && [ "$INPUT_FORCE" != true ]; then build=false; fi
+          if [ "$EVENT" = schedule ]; then
+            # Any +k8sN release of this version counts, so a manual rebuild isn't followed by a lower revision.
+            existing=$(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -F "${version}+k8s" || true)
+            [ -z "$existing" ] || build=false
+          elif gh release view "$tag" >/dev/null 2>&1 && [ "$INPUT_FORCE" != true ]; then
+            build=false
+          fi
           echo "version=$version tag=$tag build=$build"
           { echo "version=$version"; echo "tag=$tag"; echo "build=$build"; } >> "$GITHUB_OUTPUT"
 
