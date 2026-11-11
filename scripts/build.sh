@@ -55,7 +55,7 @@ echo "package name check OK"
 # mintools = only linux-kbuild, which the headers package depends on.
 export DEB_BUILD_PROFILES="pkg.linux.nokerneldbg pkg.linux.mintools pkg.linux.nosource nodoc"
 jobs=$(nproc)
-export DEB_BUILD_OPTIONS="parallel=${jobs} nodoc"
+export DEB_BUILD_OPTIONS="parallel=${jobs} nodoc noautodbgsym"
 
 "${FAKEROOT[@]}" make -f debian/rules.gen setup_arm64_rpi_2712
 

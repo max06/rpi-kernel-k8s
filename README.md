@@ -84,11 +84,11 @@ cat /sys/kernel/security/lsm      # contains landlock
 - **Updates lag the stock kernel** by up to a day (daily check plus a build of
   about an hour). The second pin keeps a new stock kernel from being installed
   in the meantime.
-- **`v8` packages:** Raspberry Pi OS also installs the `rpi-v8` kernel
-  (`linux-image-rpi-v8`, `linux-headers-rpi-v8`), which a Pi 5 doesn't boot.
-  Its headers share `linux-headers-<abi>-common-rpi` and `linux-kbuild-<abi>`
-  with rpi-2712. With the pin above, `linux-headers-rpi-v8` is kept back after a
-  stock update. That's harmless, or you can remove the v8 packages.
+- **`v8` headers get removed:** Raspberry Pi OS also installs the `rpi-v8`
+  kernel, which a Pi 5 doesn't boot. Its headers (`linux-headers-rpi-v8`,
+  `linux-headers-<abi>-rpi-v8`) depend on the exact stock version of the shared
+  `linux-headers-<abi>-common-rpi` and `linux-kbuild-<abi>`, so apt removes them
+  when it installs the rebuilt ones. The v8 kernel image itself stays.
 - **Going back:** remove the two files above, then
   `sudo apt install --allow-downgrades linux-image-rpi-2712=<stock version> …`
   for the packages listed under [How it works](#how-it-works).
