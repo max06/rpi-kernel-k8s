@@ -1,0 +1,135 @@
+name: build
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Source version without epoch, e.g. 6.18.60-1+rpt1 (default: newest in the archive)"
+        required: false
+      revision:
+        description: "Local revision N in +k8sN (bump to rebuild the same upstream version)"
+        default: "1"
+      force:
+        description: "Rebuild even if the release already exists"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # renovate: datasource=docker depName=debian
+  BUILD_IMAGE: debian:trixie
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REVISION: ${{ inputs.revision || '1' }}
+          INPUT_FORCE: ${{ inputs.force || false }}
+        run: |
+          version=${INPUT_VERSION:-$(scripts/latest-version.sh)}
+          [[ $version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+\+rpt[0-9]+$ ]] || { echo "unexpected version: $version"; exit 1; }
+          [[ $INPUT_REVISION =~ ^[0-9]+$ ]] || { echo "unexpected revision: $INPUT_REVISION"; exit 1; }
+          tag="${version}+k8s${INPUT_REVISION}"
+          build=true
+          if gh release view "$tag" >/dev/null 2>&1 && [ "$INPUT_FORCE" != true ]; then build=false; fi
+          echo "version=$version tag=$tag build=$build"
+          { echo "version=$version"; echo "tag=$tag"; echo "build=$build"; } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+
+      # A build with DWARF debug info needs roughly 20 GB.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache /usr/share/swift || true
+          sudo docker image prune -af >/dev/null || true
+          df -h /
+
+      - name: Build
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          TAG: ${{ needs.check.outputs.tag }}
+        run: |
+          rc=0
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            -e LOCAL_SUFFIX="+${TAG##*+}" -e WORK_DIR=/build \
+            "$BUILD_IMAGE" scripts/ci-build.sh "$VERSION" /repo/out > build.log 2>&1 || rc=$?
+          grep -aE '^(package name|config check|real|user|BUILD_DONE)|FAILED|missing package|^Filesystem|^overlay|/dev/root' build.log || true
+          tail -n 40 build.log
+          xz -T0 build.log
+          ls -l out || true
+          exit "$rc"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: packages
+          path: |
+            out/
+            build.log.xz
+          if-no-files-found: warn
+          retention-days: 14
+
+  release:
+    needs: [check, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.check.outputs.tag }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          notes="Raspberry Pi OS kernel \`1:${VERSION}\` (rpi-2712 / Pi 5) rebuilt with BTF and Landlock.
+
+          Source: \`linux_${VERSION}.dsc\` from archive.raspberrypi.com (verified via apt). Changed options: [config/rpi-2712.config](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/config/rpi-2712.config). Full kernel config attached."
+          files=(out/* build.log.xz)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" --title "$TAG" --notes "$notes" --target "$GITHUB_SHA"
+          fi
+
+  publish:
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit

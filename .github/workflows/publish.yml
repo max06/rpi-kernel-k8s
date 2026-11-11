@@ -1,0 +1,58 @@
+name: publish
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download the newest releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP: "3"
+        run: |
+          mkdir -p debs
+          gh release list --limit "$KEEP" --exclude-drafts --json tagName --jq '.[].tagName' \
+            | while read -r tag; do
+                gh release download "$tag" --pattern '*.deb' --dir debs --skip-existing
+              done
+          ls -l debs
+
+      - name: Import the signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          [ -n "$APT_SIGNING_KEY" ] || { echo "secret APT_SIGNING_KEY is not set"; exit 1; }
+          gpg --batch --import <<< "$APT_SIGNING_KEY"
+
+      - run: scripts/publish-repo.sh debs site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
