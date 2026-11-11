@@ -10,6 +10,9 @@ The stock kernel is built with `CONFIG_DEBUG_INFO_NONE=y` and without Landlock:
   load its socket-LB programs without it, and new pods get no networking.
 - **No Landlock**, so sandboxes that use it (e.g. for coding agents or other
   untrusted workloads) can't enforce anything.
+- **No UDP socket diag / `SOCK_DESTROY`** (`CONFIG_INET_UDP_DIAG`,
+  `CONFIG_INET_DIAG_DESTROY`). Cilium's socket-LB then can't close sockets that
+  still point at deleted service backends, and logs an error about it at startup.
 
 Everything else is the stock kernel: same source package, same patches, same
 package names and boot hooks. Only the options in
